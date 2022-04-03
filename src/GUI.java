@@ -1,4 +1,6 @@
 import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Label;
 import java.awt.event.ActionEvent;
@@ -10,27 +12,24 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JFrame;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-
+import javax.swing.*;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 
 public class GUI {
+
+	private JList<String>musicFiles;
 	JFrame frame;
 	MidiController midiEv;
 	JPanel mainPanel, background;
+	JTextField saveLoadFileNameField;
 	ArrayList <JCheckBox> checkBoxList; //will store the checkboxes
 	Box buttonBox;
+	String fileName;
 	
 	public GUI () {
 		buildGui();
+		listFolderContent();
 	}
 	
 	public void buildGui() {	
@@ -57,7 +56,7 @@ public class GUI {
 		background.add(BorderLayout.WEST, nameBox);
 		
 		frame.getContentPane().add(background);
-		//set-up Grid
+		//set-up checkbox Grid
 		GridLayout grid = new GridLayout(16,16);
 		grid.setVgap(1);
 		grid.setHgap(2);
@@ -82,7 +81,7 @@ public class GUI {
 		frame = new JFrame ("Cyber Beatbox");
 		BorderLayout layout = new BorderLayout();
 		background = new JPanel (layout);
-	
+		saveLoadFileNameField = new JTextField ();
 	}		
 
 	private void setMenuBar() {
@@ -91,13 +90,14 @@ public class GUI {
 			JMenu fileMenu = new JMenu("File");
 			JMenu editMenu = new JMenu ("Edit");
 			JMenu viewMenu = new JMenu ("View");
-
+			
 			JMenuItem newMenuItem = new JMenuItem("New");
 			fileMenu.add(newMenuItem);
 			
 			menuBar.add(fileMenu);
 			menuBar.add(editMenu);
 			menuBar.add(viewMenu);
+			
 			frame.setJMenuBar(menuBar);
 	}
 
@@ -129,9 +129,59 @@ public class GUI {
 		JButton load = new JButton ("Load");
 		load.addActionListener(new MyLoadListener());
 		buttonBox.add(load);
-	}
+		
+		//Put JTextField in a JPanel
+		JPanel textPanel = new JPanel();
+		saveLoadFileNameField.setPreferredSize(new Dimension(200, 30));
+		textPanel.add(saveLoadFileNameField);
+		buttonBox.add(textPanel);
+	
 
-//Buttons action
+		createListOfItems();
+
+		//hand over the JLIST to ScrollPane & Display
+		JScrollPane jcp = new JScrollPane (musicFiles);
+		buttonBox.add(jcp);
+		//CLICK OR UNCLICK AFFECTS THIS ACTIONLISTENER
+		musicFiles.addListSelectionListener(new ListSelectionListener() {
+			@Override
+			public void valueChanged(ListSelectionEvent e) {
+				String selectedItem = (String) musicFiles.getSelectedValue();
+				System.out.println(selectedItem);
+			}
+		});
+
+	}
+	
+	private void createListOfItems() {
+		ArrayList <String> contentList = listFolderContent();
+		String []contentArray = new String[contentList.size()];
+		for (int i=0;i<contentList.size();i++) {
+			contentArray[i]=contentList.get(i);
+		}
+		//create JLIST to show items names
+		musicFiles = new JList<String>(contentArray);
+		musicFiles.setVisibleRowCount(4);
+		
+		
+	}
+//TODO: clean the code
+	private ArrayList <String> listFolderContent() {
+		ArrayList <String> listOfFiles = new ArrayList<>();
+		//main dir
+		String filePath = System.getProperty("user.dir"); 
+		String newPath = filePath+"\\saveObjects";
+		//designated dir
+        File[] filesInDirectory = new File(newPath).listFiles(); //list all files (just names+extension)
+        for (File f : filesInDirectory) {
+        	String path = f.getAbsolutePath();
+    		String extendedPath = path.substring(path.lastIndexOf("\\") + 1, path.length());
+        	listOfFiles.add(extendedPath);
+        }
+        return listOfFiles;
+	}
+	
+// Buttons&&Fields action
 //start inner class
 	public class MyStartListener implements ActionListener{
 		public void actionPerformed(ActionEvent a) {
@@ -168,37 +218,42 @@ public class GUI {
 		public class MySaveListener implements ActionListener{
 			public void actionPerformed(ActionEvent e) {
 				boolean []checkBoxState = new boolean [256];
+				//start loop to copy checkBoxList content
 				for (int i=0;i<checkBoxState.length;i++) {
 					JCheckBox check = (JCheckBox) checkBoxList.get(i);
 					if (check.isSelected()) {
 						checkBoxState[i]=true;
 					}
-				}//copy the checkBoxList
+				}//end of loop
 
 				try {
-					FileOutputStream file = new FileOutputStream("fileName.ser");
-					ObjectOutputStream o = new ObjectOutputStream (file);
-					o.writeObject(checkBoxState);
-					File f = new File(".");
-					System.out.println(f.getAbsolutePath());
-					o.close();
-					
-				}catch(Exception ee) {ee.printStackTrace();}
-				
-			}
+					//save in designated directory for .ser files
+					String directoryPath = System.getProperty("user.dir");
+					String newPath = directoryPath+"\\saveObjects";
 
-		}
-		
+					//return content from textField
+					fileName = saveLoadFileNameField.getText();
+					 //Write converted file
+				    File newFile = new File(newPath, fileName+".ser" );
+				    FileOutputStream fos = new FileOutputStream(newFile);
+				    ObjectOutputStream oo = new ObjectOutputStream (fos);
+				    oo.writeObject(checkBoxState);
+					oo.close();			
+				}catch(Exception ee) {ee.printStackTrace();}			
+			}
+		}//close inner class
+		//start inner class
 		public class MyLoadListener implements ActionListener{
-			
 			public void actionPerformed(ActionEvent e) {
 				boolean [] checkBoxState = null;
 				try {
-					FileInputStream Load = new FileInputStream(new File("fileName.ser"));
+					fileName = saveLoadFileNameField.getText();
+					FileInputStream Load = new FileInputStream(new File(fileName+".ser"));
 					ObjectInputStream is = new ObjectInputStream(Load);
 					checkBoxState = (boolean[]) is.readObject();
 					
 				}catch(Exception eee) {eee.printStackTrace();}
+				//override content from the loaded .ser file over checkBoxList
 				for (int i=0;i<256;i++) {
 					JCheckBox check = (JCheckBox) checkBoxList.get(i);
 					if (checkBoxState[i]) {
@@ -206,7 +261,16 @@ public class GUI {
 					}else {
 						check.setSelected(false);
 					}
-				}
+				}//close loop
+			}
+		}//close inner class
+		//start inner class
+		public class mySelectItemListener implements ActionListener{
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// TODO Auto-generated method stub
+				String selectedItem = (String) musicFiles.getSelectedValue();
+				System.out.println(selectedItem);
 			}
 			
 		}
